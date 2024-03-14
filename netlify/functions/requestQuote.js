@@ -32,8 +32,7 @@ exports.handler = async function(event, context) {
         };
     });
     const customerId = payload.customerId;
-    const customerTags = payload.customerTags;
-    const note = payload.notes;
+    const discountValue = payload.discountValue
     
     // Create the draft order in Shopify
     try {
@@ -43,6 +42,13 @@ exports.handler = async function(event, context) {
                     line_items: lineItems,
                     customer: {
                         id: customerId
+                    },
+                    applied_discount: {
+                        description: "Point de vente",
+                        value_type: "fixed_amount",
+                        value: discountValue,
+                        amount: discountValue,
+                        title: "Point de vente",
                     },
                     use_customer_default_address: true
                 } 
