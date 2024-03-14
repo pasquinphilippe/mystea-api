@@ -23,7 +23,7 @@ exports.handler = async function(event, context) {
     }
     console.log(event.body);
     const payload = JSON.parse(event.body);
-
+    console.log(payload);
     // Extract variant IDs, quantities, and customerId from the payload
     const lineItems = payload.lineItems.map(item => {
         return {
