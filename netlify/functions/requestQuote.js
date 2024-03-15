@@ -20,6 +20,8 @@ exports.handler = async function(event, context) {
         return { statusCode: 405, headers: headers, body: "Method Not Allowed" };
     }
 
+    const payload = JSON.parse(event.body);
+
     try {
         const lineItems = payload.lineItems.map(item => ({
             variant_id: item.variantID,
@@ -102,8 +104,7 @@ exports.handler = async function(event, context) {
         );
         
         const orderData = orderResponse.data;
-        console.log(orderData);
-
+            console.log(orderData);
         return {
             statusCode: 200,
             headers: headers,
