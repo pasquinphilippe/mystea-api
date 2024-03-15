@@ -75,11 +75,17 @@ exports.handler = async function(event, context) {
             })
         };
     } catch (error) {
-        console.error("Error:", error);
+        console.error("Error creating order:", error.message);
+        if (error.response) {
+            console.error("Response status:", error.response.status);
+            console.error("Response data:", error.response.data);
+        }
         return {
-            statusCode: 500,
+            statusCode: error.response ? error.response.status : 500,
             headers: headers,
-            body: JSON.stringify({ error: error.message })
+            body: JSON.stringify({ 
+                error: error.message,
+                response: error.response ? error.response.data : null
+            })
         };
     }
-};
