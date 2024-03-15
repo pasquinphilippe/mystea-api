@@ -20,8 +20,6 @@ exports.handler = async function(event, context) {
         return { statusCode: 405, headers: headers, body: "Method Not Allowed" };
     }
 
-    const payload = JSON.parse(event.body);
-
     try {
         const lineItems = payload.lineItems.map(item => ({
             variant_id: item.variantID,
@@ -91,7 +89,7 @@ exports.handler = async function(event, context) {
         const completedOrderData = completeResponse.data;
         
         // Assuming the order ID is available in completedOrderData
-        const lastOrderId = completedOrderData.draft_order.order_id;
+        const lastOrderId = completedOrderData.draft_order.customer.last_order_id;
 
         // Fetch the completed order details
         const orderResponse = await axios.get(
@@ -104,6 +102,7 @@ exports.handler = async function(event, context) {
         );
         
         const orderData = orderResponse.data;
+        console.log(orderData);
 
         return {
             statusCode: 200,
