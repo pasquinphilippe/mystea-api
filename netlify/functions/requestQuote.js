@@ -31,6 +31,7 @@ exports.handler = async function(event, context) {
         const discountValue = payload.discountValue;
         const subject = payload.subject;
         const message = payload.message;
+
         // Create the draft order
         const shopifyResponse = await axios.post(
             `${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/draft_orders.json`,
@@ -56,13 +57,13 @@ exports.handler = async function(event, context) {
         );
 
         const draftOrderData = shopifyResponse.data;
-        
-        // Send the invoice (if necessary)
+
+        // Send the invoice
         await axios.post(
             `${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/draft_orders/${draftOrderData.draft_order.id}/send_invoice.json`,
             {
                 draft_order_invoice: {
-                    to: payload.customerEmail,
+                    to: draftOrderData.draft_order.email,
                     from: "info@mystea.ca",
                     subject: subject,
                     custom_message: message
@@ -88,14 +89,28 @@ exports.handler = async function(event, context) {
         );
 
         const completedOrderData = completeResponse.data;
-            console.log(completedOrderData);
-        // Return the response with the invoice URL from the completed order
+        
+        // Assuming the order ID is available in completedOrderData
+        const lastOrderId = completedOrderData.draft_order.order_id;
+
+        // Fetch the completed order details
+        const orderResponse = await axios.get(
+            `${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/orders/${lastOrderId}.json`,
+            {
+                headers: {
+                    "X-Shopify-Access-Token": process.env.SHOPIFY_TOKEN
+                }
+            }
+        );
+        
+        const orderData = orderResponse.data;
+
         return {
             statusCode: 200,
             headers: headers,
             body: JSON.stringify({
-                completedOrder: completedOrderData,
-                invoiceUrl: completedOrderData.draft_order.invoice_url
+                order: orderData.order,
+                invoiceUrl: completedOrderData.draft_order.invoice_url // Assuming this is the correct invoice URL
             })
         };
     } catch (error) {
