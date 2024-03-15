@@ -32,12 +32,7 @@ exports.handler = async function(event, context) {
                 customer: {
                     id: payload.customerId
                 },
-                financial_status: "pending",
-                transactions: [{
-                    kind: "authorization",
-                    status: "pending",
-                    amount: payload.totalPrice
-                }]
+                financial_status: "pending"
             }
         };
 
