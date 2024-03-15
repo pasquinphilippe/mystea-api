@@ -44,9 +44,7 @@ exports.handler = async function(event, context) {
                     code: payload.discountCode, // Assuming this is sent in the payload
                     amount: payload.discountValue,
                     type: "fixed_amount" // or "percentage" based on your discount type
-                }],
-                send_receipt: false,
-                send_fulfillment_receipt: false
+                }]
             }
         };
 
@@ -73,7 +71,7 @@ exports.handler = async function(event, context) {
             headers: headers,
             body: JSON.stringify({
                 order: createdOrderData.order,
-                orderStatusUrl: orderStatusUrl
+                invoiceUrl: orderStatusUrl
             })
         };
     } catch (error) {
