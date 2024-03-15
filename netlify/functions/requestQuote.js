@@ -2,14 +2,12 @@ const axios = require('axios');
 require('dotenv').config();
 
 exports.handler = async function(event, context) {
-    // Define CORS headers
     const headers = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type",
         "Access-Control-Allow-Methods": "POST, GET, OPTIONS"
     };
 
-    // Handle preflight CORS request
     if (event.httpMethod === "OPTIONS") {
         return {
             statusCode: 204,
@@ -18,34 +16,33 @@ exports.handler = async function(event, context) {
         };
     }
 
-    // Only allow POST method for creating orders
     if (event.httpMethod !== "POST") {
         return { statusCode: 405, headers: headers, body: "Method Not Allowed" };
     }
 
     const payload = JSON.parse(event.body);
 
-    // Extract relevant data from payload
-    const lineItems = payload.lineItems.map(item => ({
-        variant_id: item.variantID,
-        quantity: item.quantity
-    }));
-    const customerId = payload.customerId;
-    const discountValue = payload.discountValue;
-
     try {
+        const lineItems = payload.lineItems.map(item => ({
+            variant_id: item.variantID,
+            quantity: item.quantity
+        }));
+        const customerId = payload.customerId;
+        const discountValue = payload.discountValue;
+        const subject = payload.subject;
+        const message = payload.message;
         // Create the draft order
         const shopifyResponse = await axios.post(
-            "https://mystea-shop.myshopify.com/admin/api/2023-10/draft_orders.json",
+            `${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/draft_orders.json`,
             {
                 draft_order: {
                     line_items: lineItems,
                     customer: { id: customerId },
                     applied_discount: {
-                        description: "Points de vente",
+                        description: "Discount Description",
                         value_type: "fixed_amount",
                         value: discountValue,
-                        title: "Points de vente",
+                        title: "Discount Title",
                     },
                     use_customer_default_address: true
                 }
@@ -58,19 +55,14 @@ exports.handler = async function(event, context) {
             }
         );
 
-        const shopifyData = shopifyResponse.data;
-
-        const draftOrderId = shopifyData.draft_order.id;
-        const customerEmail = shopifyData.draft_order.customer.email;
-        const subject = payload.subject;
-        const message = payload.message;
-
-        // Send the invoice
-        const invoiceResponse = await axios.post(
-            `https://mystea-shop.myshopify.com/admin/api/2023-10/draft_orders/${draftOrderId}/send_invoice.json`,
+        const draftOrderData = shopifyResponse.data;
+        
+        // Send the invoice (if necessary)
+        await axios.post(
+            `${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/draft_orders/${draftOrderData.draft_order.id}/send_invoice.json`,
             {
                 draft_order_invoice: {
-                    to: customerEmail,
+                    to: payload.customerEmail,
                     from: "info@mystea.ca",
                     subject: subject,
                     custom_message: message
@@ -84,22 +76,30 @@ exports.handler = async function(event, context) {
             }
         );
 
-        const invoiceData = invoiceResponse.data;
-        const invoiceUrl = shopifyData.draft_order.invoice_url; // Correctly extracted invoice URL from the response
+        // Complete the draft order and mark the payment as pending
+        const completeResponse = await axios.put(
+            `${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/draft_orders/${draftOrderData.draft_order.id}/complete.json?payment_pending=true`,
+            {},
+            {
+                headers: {
+                    "X-Shopify-Access-Token": process.env.SHOPIFY_TOKEN
+                }
+            }
+        );
 
+        const completedOrderData = completeResponse.data;
 
-        // Return the combined response
+        // Return the response with the invoice URL from the completed order
         return {
             statusCode: 200,
             headers: headers,
             body: JSON.stringify({
-                draftOrder: shopifyData,
-                invoice: invoiceData,
-                invoiceUrl: invoiceUrl  // Include the invoice URL in the response
-
+                completedOrder: completedOrderData,
+                invoiceUrl: completedOrderData.draft_order.invoice_url
             })
         };
     } catch (error) {
+        console.error("Error:", error);
         return {
             statusCode: 500,
             headers: headers,
