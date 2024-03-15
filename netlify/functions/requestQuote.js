@@ -23,30 +23,37 @@ exports.handler = async function(event, context) {
     const payload = JSON.parse(event.body);
 
     try {
-        const lineItems = payload.lineItems.map(item => ({
-            variant_id: item.variantID,
-            quantity: item.quantity
-        }));
-        const customerId = payload.customerId;
-        const discountValue = payload.discountValue;
-        const subject = payload.subject;
-        const message = payload.message;
-        // Create the draft order
-        const shopifyResponse = await axios.post(
-            `${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/draft_orders.json`,
-            {
-                draft_order: {
-                    line_items: lineItems,
-                    customer: { id: customerId },
-                    applied_discount: {
-                        description: "Discount Description",
-                        value_type: "fixed_amount",
-                        value: discountValue,
-                        title: "Discount Title",
-                    },
-                    use_customer_default_address: true
-                }
-            },
+        // Prepare the order data
+        const orderData = {
+            order: {
+                line_items: payload.lineItems.map(item => ({
+                    variant_id: item.variantID,
+                    quantity: item.quantity
+                })),
+                customer: {
+                    id: payload.customerId
+                },
+                financial_status: "pending",
+                transactions: [{
+                    kind: "authorization",
+                    status: "pending",
+                    amount: payload.totalPrice
+                }],
+                // Add more fields as necessary, e.g., billing_address, shipping_address
+                discount_codes: [{
+                    code: payload.discountCode, // Assuming this is sent in the payload
+                    amount: payload.discountValue,
+                    type: "fixed_amount" // or "percentage" based on your discount type
+                }],
+                send_receipt: false,
+                send_fulfillment_receipt: false
+            }
+        };
+
+        // Create the order
+        const createOrderResponse = await axios.post(
+            `${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/orders.json`,
+            orderData,
             {
                 headers: {
                     "Content-Type": "application/json",
@@ -55,47 +62,18 @@ exports.handler = async function(event, context) {
             }
         );
 
-        const draftOrderData = shopifyResponse.data;
-        
-        // Send the invoice (if necessary)
-        await axios.post(
-            `${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/draft_orders/${draftOrderData.draft_order.id}/send_invoice.json`,
-            {
-                draft_order_invoice: {
-                    to: payload.customerEmail,
-                    from: "info@mystea.ca",
-                    subject: subject,
-                    custom_message: message
-                }
-            },
-            {
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-Shopify-Access-Token": process.env.SHOPIFY_TOKEN
-                }
-            }
-        );
+        const createdOrderData = createOrderResponse.data;
 
-        // Complete the draft order and mark the payment as pending
-        const completeResponse = await axios.put(
-            `${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/draft_orders/${draftOrderData.draft_order.id}/complete.json?payment_pending=true`,
-            {},
-            {
-                headers: {
-                    "X-Shopify-Access-Token": process.env.SHOPIFY_TOKEN
-                }
-            }
-        );
+        // Extract the order status URL
+        const orderStatusUrl = createdOrderData.order.order_status_url;
 
-        const completedOrderData = completeResponse.data;
-
-        // Return the response with the invoice URL from the completed order
+        // Return the response with the order status URL
         return {
             statusCode: 200,
             headers: headers,
             body: JSON.stringify({
-                completedOrder: completedOrderData,
-                invoiceUrl: completedOrderData.draft_order.invoice_url
+                order: createdOrderData.order,
+                orderStatusUrl: orderStatusUrl
             })
         };
     } catch (error) {
