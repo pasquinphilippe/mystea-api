@@ -88,7 +88,7 @@ exports.handler = async function(event, context) {
         );
 
         const completedOrderData = completeResponse.data;
-
+            console.log(completedOrderData);
         // Return the response with the invoice URL from the completed order
         return {
             statusCode: 200,
