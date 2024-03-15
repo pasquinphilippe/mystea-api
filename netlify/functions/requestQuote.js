@@ -59,6 +59,7 @@ exports.handler = async function(event, context) {
         );
 
         const shopifyData = shopifyResponse.data;
+
         const draftOrderId = shopifyData.draft_order.id;
         const customerEmail = shopifyData.draft_order.customer.email;
         const subject = payload.subject;
@@ -84,6 +85,8 @@ exports.handler = async function(event, context) {
         );
 
         const invoiceData = invoiceResponse.data;
+        const invoiceUrl = shopifyData.draft_order.invoice_url; // Correctly extracted invoice URL from the response
+
 
         // Return the combined response
         return {
@@ -91,7 +94,9 @@ exports.handler = async function(event, context) {
             headers: headers,
             body: JSON.stringify({
                 draftOrder: shopifyData,
-                invoice: invoiceData
+                invoice: invoiceData,
+                invoiceUrl: invoiceUrl  // Include the invoice URL in the response
+
             })
         };
     } catch (error) {
