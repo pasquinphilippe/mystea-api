@@ -41,13 +41,8 @@ exports.handler = async function(event, context) {
                 draft_order: {
                     line_items: lineItems,
                     customer: { id: customerId },
-                    applied_discount: {
-                        description: "Points de vente",
-                        value_type: "fixed_amount",
-                        value: discountValue,
-                        title: "Points de vente",
-                    },
-                    use_customer_default_address: true
+                    use_customer_default_address: true,
+                    tags: "PDV"
                 }
             },
             {
