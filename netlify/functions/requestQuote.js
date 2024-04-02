@@ -83,22 +83,24 @@ exports.handler = async function(event, context) {
         const invoiceUrl = shopifyData.draft_order.invoice_url; // Correctly extracted invoice URL from the response
 
 
-        // Return the combined response
-        return {
-            statusCode: 200,
-            headers: headers,
-            body: JSON.stringify({
-                draftOrder: shopifyData,
-                invoice: invoiceData,
-                invoiceUrl: invoiceUrl  // Include the invoice URL in the response
+       // Delay for 5 seconds before sending the combined response
+       await new Promise(resolve => setTimeout(resolve, 5000));
 
-            })
-        };
-    } catch (error) {
-        return {
-            statusCode: 500,
-            headers: headers,
-            body: JSON.stringify({ error: error.message })
-        };
-    }
+       // Return the combined response
+       return {
+           statusCode: 200,
+           headers: headers,
+           body: JSON.stringify({
+               draftOrder: shopifyData,
+               invoice: invoiceData,
+               invoiceUrl: invoiceUrl  // Include the invoice URL in the response
+           })
+       };
+   } catch (error) {
+       return {
+           statusCode: 500,
+           headers: headers,
+           body: JSON.stringify({ error: error.message })
+       };
+   }
 };
