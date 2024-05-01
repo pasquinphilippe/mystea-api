@@ -55,36 +55,11 @@ exports.handler = async function(event, context) {
 
         const shopifyData = shopifyResponse.data;
 
-        const draftOrderId = shopifyData.draft_order.id;
-        const customerEmail = shopifyData.draft_order.customer.email;
-        const subject = payload.subject;
-        const message = payload.message;
-
-        // Send the invoice
-        const invoiceResponse = await axios.post(
-            `https://mystea-shop.myshopify.com/admin/api/2023-10/draft_orders/${draftOrderId}/send_invoice.json`,
-            {
-                draft_order_invoice: {
-                    to: customerEmail,
-                    from: "info@mystea.ca",
-                    subject: subject,
-                    custom_message: message
-                }
-            },
-            {
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-Shopify-Access-Token": process.env.SHOPIFY_TOKEN
-                }
-            }
-        );
-
-        const invoiceData = invoiceResponse.data;
         const invoiceUrl = shopifyData.draft_order.invoice_url; // Correctly extracted invoice URL from the response
 
 
        // Delay for 5 seconds before sending the combined response
-       await new Promise(resolve => setTimeout(resolve, 5000));
+       await new Promise(resolve => setTimeout(resolve, 2500));
 
        // Return the combined response
        return {
@@ -92,7 +67,6 @@ exports.handler = async function(event, context) {
            headers: headers,
            body: JSON.stringify({
                draftOrder: shopifyData,
-               invoice: invoiceData,
                invoiceUrl: invoiceUrl  // Include the invoice URL in the response
            })
        };
