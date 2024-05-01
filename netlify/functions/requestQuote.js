@@ -58,9 +58,6 @@ exports.handler = async function(event, context) {
         const invoiceUrl = shopifyData.draft_order.invoice_url; // Correctly extracted invoice URL from the response
 
 
-       // Delay for 5 seconds before sending the combined response
-       await new Promise(resolve => setTimeout(resolve, 2500));
-
        // Return the combined response
        return {
            statusCode: 200,
