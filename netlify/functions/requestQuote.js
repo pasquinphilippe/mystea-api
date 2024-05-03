@@ -9,6 +9,7 @@ exports.handler = async function(event, context) {
     };
 
     if (event.httpMethod === "OPTIONS") {
+        console.log("Handling OPTIONS request");
         return {
             statusCode: 204,
             headers: headers,
@@ -17,18 +18,23 @@ exports.handler = async function(event, context) {
     }
 
     if (event.httpMethod !== "POST") {
+        console.log("Request method not allowed: ", event.httpMethod);
         return { statusCode: 405, headers: headers, body: "Method Not Allowed" };
     }
 
     const payload = JSON.parse(event.body);
+    console.log("Received payload: ", payload);
+
     const lineItems = payload.lineItems.map(item => ({
         variant_id: item.variantID,
         quantity: item.quantity
     }));
     const customerId = payload.customerId;
+    console.log("Parsed line items and customer ID: ", lineItems, customerId);
 
     try {
         // Create the draft order
+        console.log("Creating draft order");
         const draftOrderResponse = await axios.post(
             "https://mystea-shop.myshopify.com/admin/api/2023-10/draft_orders.json",
             {
@@ -47,24 +53,48 @@ exports.handler = async function(event, context) {
             }
         );
 
-        const draftOrderData = draftOrderResponse.data;
-        const invoiceUrl = draftOrderData.draft_order.invoice_url; // Extract the invoice URL from draft order creation
+        const draftOrderId = draftOrderResponse.data.draft_order.id;
+        console.log("Draft order created with ID: ", draftOrderId);
 
-        // Log the invoice URL
-        console.log("Invoice URL:", invoiceUrl);
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        // Function to check for the synced tag and get the updated draft order details
+        async function waitForTagSync(draftOrderId, timeout = 30000) {
+            const startTime = Date.now();
+            while (Date.now() - startTime < timeout) {
+                const response = await axios.get(
+                    `https://mystea-shop.myshopify.com/admin/api/2023-10/draft_orders/${draftOrderId}.json`,
+                    {
+                        headers: {
+                            "X-Shopify-Access-Token": process.env.SHOPIFY_TOKEN
+                        }
+                    }
+                );
+                const currentTags = response.data.draft_order.tags;
+                console.log("Current tags on draft order: ", currentTags);
+                if (currentTags.includes("synced")) {
+                    console.log("Tag 'synced' found, proceeding");
+                    return response.data.draft_order; // Return the updated draft order
+                }
+                // Wait for a bit before trying again
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            throw new Error("Timeout waiting for tag sync");
+        }
 
-        // Return the draft order and invoice URL
+        // Wait for the tag to be synced and fetch the updated draft order
+        const updatedDraftOrder = await waitForTagSync(draftOrderId);
+        console.log("Proceeding after tag sync");
+
+        // Return the draft order details and invoice URL
         return {
             statusCode: 200,
             headers: headers,
             body: JSON.stringify({
-                draftOrder: draftOrderData.draft_order,
-                invoiceUrl: invoiceUrl
+                draftOrder: updatedDraftOrder,
+                invoiceUrl: updatedDraftOrder.invoice_url // Ensure the invoice URL is from the updated draft order
             })
         };
     } catch (error) {
-        console.error("Error:", error.message);  // Also log any errors
+        console.error("Error during process: ", error.message);
         return {
             statusCode: 500,
             headers: headers,
