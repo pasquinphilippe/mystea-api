@@ -2,15 +2,14 @@ const axios = require('axios');
 require('dotenv').config();
 
 exports.handler = async function(event, context) {
-    // Define CORS headers
     const headers = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type",
         "Access-Control-Allow-Methods": "POST, GET, OPTIONS"
     };
 
-    // Handle preflight CORS request
     if (event.httpMethod === "OPTIONS") {
+        console.log("Handling OPTIONS request");
         return {
             statusCode: 204,
             headers: headers,
@@ -18,24 +17,25 @@ exports.handler = async function(event, context) {
         };
     }
 
-    // Only allow POST method for creating orders
     if (event.httpMethod !== "POST") {
+        console.log("Request method not allowed: ", event.httpMethod);
         return { statusCode: 405, headers: headers, body: "Method Not Allowed" };
     }
 
     const payload = JSON.parse(event.body);
+    console.log("Received payload: ", payload);
 
-    // Extract relevant data from payload
     const lineItems = payload.lineItems.map(item => ({
         variant_id: item.variantID,
         quantity: item.quantity
     }));
     const customerId = payload.customerId;
-    const discountValue = payload.discountValue;
+    console.log("Parsed line items and customer ID: ", lineItems, customerId);
 
     try {
         // Create the draft order
-        const shopifyResponse = await axios.post(
+        console.log("Creating draft order");
+        const draftOrderResponse = await axios.post(
             "https://mystea-shop.myshopify.com/admin/api/2023-10/draft_orders.json",
             {
                 draft_order: {
@@ -53,54 +53,54 @@ exports.handler = async function(event, context) {
             }
         );
 
-        const shopifyData = shopifyResponse.data;
+        const draftOrderId = draftOrderResponse.data.draft_order.id;
+        console.log("Draft order created with ID: ", draftOrderId);
 
-        const draftOrderId = shopifyData.draft_order.id;
-        const customerEmail = shopifyData.draft_order.customer.email;
-        const subject = payload.subject;
-        const message = payload.message;
-
-        // Send the invoice
-        const invoiceResponse = await axios.post(
-            `https://mystea-shop.myshopify.com/admin/api/2023-10/draft_orders/${draftOrderId}/send_invoice.json`,
-            {
-                draft_order_invoice: {
-                    to: customerEmail,
-                    from: "info@mystea.ca",
-                    subject: subject,
-                    custom_message: message
+        // Function to check for the synced tag and get the updated draft order details
+        async function waitForTagSync(draftOrderId, timeout = 30000) {
+            const startTime = Date.now();
+            while (Date.now() - startTime < timeout) {
+                const response = await axios.get(
+                    `https://mystea-shop.myshopify.com/admin/api/2023-10/draft_orders/${draftOrderId}.json`,
+                    {
+                        headers: {
+                            "X-Shopify-Access-Token": process.env.SHOPIFY_TOKEN
+                        }
+                    }
+                );
+                const currentTags = response.data.draft_order.tags;
+                console.log("Current tags on draft order: ", currentTags);
+                if (currentTags.includes("synced")) {
+                    console.log("Tag 'synced' found, proceeding");
+                    return response.data.draft_order; // Return the updated draft order
                 }
-            },
-            {
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-Shopify-Access-Token": process.env.SHOPIFY_TOKEN
-                }
+                // Wait for a bit before trying again
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
-        );
+            throw new Error("Timeout waiting for tag sync");
+        }
 
-        const invoiceData = invoiceResponse.data;
-        const invoiceUrl = shopifyData.draft_order.invoice_url; // Correctly extracted invoice URL from the response
+        // Wait for the tag to be synced and fetch the updated draft order
+        const updatedDraftOrder = await waitForTagSync(draftOrderId);
+        console.log("Proceeding after tag sync");
 
 
-       // Delay for 5 seconds before sending the combined response
-       await new Promise(resolve => setTimeout(resolve, 5000));
+        // Return the combined response
+        return {
+            statusCode: 200,
+            headers: headers,
+            body: JSON.stringify({
+                draftOrder: shopifyData,
+                invoice: invoiceData,
+                invoiceUrl: invoiceUrl  // Include the invoice URL in the response
 
-       // Return the combined response
-       return {
-           statusCode: 200,
-           headers: headers,
-           body: JSON.stringify({
-               draftOrder: shopifyData,
-               invoice: invoiceData,
-               invoiceUrl: invoiceUrl  // Include the invoice URL in the response
-           })
-       };
-   } catch (error) {
-       return {
-           statusCode: 500,
-           headers: headers,
-           body: JSON.stringify({ error: error.message })
-       };
-   }
+            })
+        };
+    } catch (error) {
+        return {
+            statusCode: 500,
+            headers: headers,
+            body: JSON.stringify({ error: error.message })
+        };
+    }
 };
