@@ -84,32 +84,17 @@ exports.handler = async function(event, context) {
         const updatedDraftOrder = await waitForTagSync(draftOrderId);
         console.log("Proceeding after tag sync");
 
-<<<<<<< HEAD
-
-        // Return the combined response
-=======
         // Return the draft order details and invoice URL
->>>>>>> ce7224b11bc32fbef25599c43180defe8dc4ccac
         return {
             statusCode: 200,
             headers: headers,
             body: JSON.stringify({
-<<<<<<< HEAD
-                draftOrder: shopifyData,
-                invoice: invoiceData,
-                invoiceUrl: invoiceUrl  // Include the invoice URL in the response
-
-            })
-        };
-    } catch (error) {
-=======
                 draftOrder: updatedDraftOrder,
                 invoiceUrl: updatedDraftOrder.invoice_url // Ensure the invoice URL is from the updated draft order
             })
         };
     } catch (error) {
         console.error("Error during process: ", error.message);
->>>>>>> ce7224b11bc32fbef25599c43180defe8dc4ccac
         return {
             statusCode: 500,
             headers: headers,
