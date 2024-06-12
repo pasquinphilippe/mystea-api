@@ -25,29 +25,14 @@ exports.handler = async function(event, context) {
     const payload = JSON.parse(event.body);
     console.log("Received payload: ", payload);
 
-    // Return 200 immediately to acknowledge receipt of the webhook
-    const response = {
-        statusCode: 200,
-        headers: headers,
-        body: "Webhook received"
-    };
+    const lineItems = payload.lineItems.map(item => ({
+        variant_id: item.variantID,
+        quantity: item.quantity
+    }));
+    const customerId = payload.customerId;
+    console.log("Parsed line items and customer ID: ", lineItems, customerId);
 
-    // Process the webhook asynchronously
-    processWebhook(payload);
-
-    return response;
-};
-
-// Asynchronous processing function
-async function processWebhook(payload) {
     try {
-        const lineItems = payload.lineItems.map(item => ({
-            variant_id: item.variantID,
-            quantity: item.quantity
-        }));
-        const customerId = payload.customerId;
-        console.log("Parsed line items and customer ID: ", lineItems, customerId);
-
         // Create the draft order
         console.log("Creating draft order");
         const draftOrderResponse = await axios.post(
@@ -99,10 +84,21 @@ async function processWebhook(payload) {
         const updatedDraftOrder = await waitForTagSync(draftOrderId);
         console.log("Proceeding after tag sync");
 
-        console.log("Draft order details: ", updatedDraftOrder);
-        console.log("Invoice URL: ", updatedDraftOrder.invoice_url);
-
+        // Return the draft order details and invoice URL
+        return {
+            statusCode: 200,
+            headers: headers,
+            body: JSON.stringify({
+                draftOrder: updatedDraftOrder,
+                invoiceUrl: updatedDraftOrder.invoice_url // Ensure the invoice URL is from the updated draft order
+            })
+        };
     } catch (error) {
         console.error("Error during process: ", error.message);
+        return {
+            statusCode: 500,
+            headers: headers,
+            body: JSON.stringify({ error: error.message })
+        };
     }
-}
+};
